@@ -81,6 +81,7 @@ function init_parsing!(io::IO, settings::ParserSettings, options::Parsers.Option
         options.e,
         TaskCondition(),
         settings.comment,
+        settings._eager_parsing,
     )
     lexer_state = LexerState{byteset}(io)
     # read and lex the entire buffer for the first time

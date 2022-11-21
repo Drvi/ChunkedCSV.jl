@@ -19,6 +19,7 @@ Base.@propagate_inbounds function _default_tryparse_timestamp(buf, pos, len, cod
         b = buf[pos += 1]
         (i > 2 && b == UInt8('-')) && break
     end
+    code |= Parsers.OK
     b != UInt8('-')  && (return DateTime(year), code | Parsers.INVALID, pos)
     b = buf[pos += 1]
 
@@ -83,11 +84,7 @@ Base.@propagate_inbounds function _default_tryparse_timestamp(buf, pos, len, cod
     second > 60 && (return DateTime(year, month, day, hour, minute), code | Parsers.INVALID, pos)
     if (pos == len || b == options.delim.token || b == options.cq.token)
         code |= isnothing(Dates.validargs(DateTime, year, month, day, hour, minute, second, 0)) ? Parsers.OK : Parsers.INVALID
-        if Parsers.ok(code)
-            return DateTime(year, month, day, hour, minute, second), code, pos
-        else
-            return DateTime(0), code, pos
-        end
+        return DateTime(year, month, day, hour, minute, second), code, pos
     end
 
     millisecond = 0
@@ -102,11 +99,7 @@ Base.@propagate_inbounds function _default_tryparse_timestamp(buf, pos, len, cod
         if (pos == len || (b + 0x30) == options.delim.token || b == options.cq.token)
             pos == len && (code |= Parsers.EOF)
             code |= isnothing(Dates.validargs(DateTime, year, month, day, hour, minute, second, millisecond)) ? Parsers.OK : Parsers.INVALID
-            if Parsers.ok(code)
-                return DateTime(year, month, day, hour, minute, second, millisecond), code, pos
-            else
-                return DateTime(0), code, pos
-            end
+            return DateTime(year, month, day, hour, minute, second, millisecond), code, pos
         end
         b += 0x30
     end
@@ -124,7 +117,7 @@ Base.@propagate_inbounds function _default_tryparse_timestamp(buf, pos, len, cod
         ztd = TimeZones.ZonedDateTime(year, month, day, hour, minute, second, millisecond, tz)
         return (Dates.DateTime(ztd, TimeZones.UTC), code | Parsers.OK, pos)
     else
-        return (Dates.DateTime(0), code | Parsers.INVALID, pos)
+        return (Dates.DateTime(year, month, day, hour, minute, second, millisecond), code | Parsers.INVALID, pos)
     end
 end
 

@@ -42,7 +42,7 @@ function process_and_consume_task(parsing_queue::Channel{T}, result_buffers::Vec
             iszero(task_end) && break
             result_buf = result_buffers[task_num]
             ctx = ifelse(use_current_context, parsing_ctx, parsing_ctx_next)
-            _parse_rows_forloop!(result_buf, @view(ctx.eols.elements[task_start:task_end]), ctx.bytes, ctx.schema, options, parsing_ctx.comment)
+            _parse_rows_forloop!(result_buf, @view(ctx.eols.elements[task_start:task_end]), ctx.bytes, ctx.schema, options, parsing_ctx.comment, parsing_ctx._eager_parsing)
             consume!(consume_ctx, ctx, result_buf, row_num, task_start)
             task_done!(consume_ctx, ctx, result_buf)
         end
@@ -75,6 +75,7 @@ function _parse_file_doublebuffer(lexer_state::LexerState, parsing_ctx::ParsingC
         parsing_ctx.escapechar,
         TaskCondition(),
         parsing_ctx.comment,
+        parsing_ctx._eager_parsing,
     )
     parser_tasks = Task[]
     for i in 1:parsing_ctx.nworkers
