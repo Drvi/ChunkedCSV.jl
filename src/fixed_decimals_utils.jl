@@ -221,7 +221,12 @@ Base.@propagate_inbounds function _typeparser(::Type{T}, f, buf::AbstractVector{
     int_sign = T(is_neg ? -1 : 1)
 
     decimal_position, ngroupmarks, exp_position, field_end, code = _dec_grp_exp_end(buf, pos, len, b, code, options)
-    Parsers.invalid(code) && return (T(0), code, field_end)
+
+    # TODO: At this point we might have marked the code as INVALID, but we proceed anyway to
+    #       try and parse a an "eager" valid value. This is an implementation detail, but
+    #       we might want to add some tests for it.
+    # Parsers.invalid(code) && return (T(0), code, field_end)
+
     # if we got here, we can safely ignore all bytes that == groupmark, these also must appear before decimal_position and exp_position
     groupmark = something(options.groupmark, 0xff)
 

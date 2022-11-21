@@ -1346,3 +1346,68 @@ end
     @test length(testctx.results[1].cols[1]) == 2
     @test length(testctx.results[1].cols[2]) == 2
 end
+
+
+@testset "_eager_parsing" begin
+    testctx = TestContext()
+    parse_file(IOBuffer("""
+        a,b
+        1,1s
+        """),
+        [Int,Int],
+        testctx,
+    )
+    @test testctx.header == [:a, :b]
+    @test testctx.results[1].cols[1] == [1]
+    @test testctx.results[1].cols[2] == [1]
+    @test testctx.results[1].row_statuses == [RowStatus.ValueParsingError | RowStatus.HasColumnIndicators]
+    @test length(testctx.results[1].cols[1]) == 1
+    @test length(testctx.results[1].cols[2]) == 1
+
+    testctx = TestContext()
+    parse_file(IOBuffer("""
+        a,b
+        1,1s
+        """),
+        [Int,Int],
+        testctx,
+        _eager_parsing=true,
+    )
+    @test testctx.header == [:a, :b]
+    @test testctx.results[1].cols[1] == [1]
+    @test testctx.results[1].cols[2] == [1]
+    @test testctx.results[1].row_statuses == [RowStatus.Ok]
+    @test length(testctx.results[1].cols[1]) == 1
+    @test length(testctx.results[1].cols[2]) == 1
+
+    testctx = TestContext()
+    parse_file(IOBuffer("""
+        a,b
+        1,2001-01-01 00:00:00
+        """),
+        [Int,Date],
+        testctx,
+    )
+    @test testctx.header == [:a, :b]
+    @test testctx.results[1].cols[1] == [1]
+    @test testctx.results[1].cols[2] == [Date(2001,1,1)]
+    @test testctx.results[1].row_statuses == [RowStatus.ValueParsingError | RowStatus.HasColumnIndicators]
+    @test length(testctx.results[1].cols[1]) == 1
+    @test length(testctx.results[1].cols[2]) == 1
+
+    testctx = TestContext()
+    parse_file(IOBuffer("""
+        a,b
+        1,2001-01-01 00:00:00
+        """),
+        [Int,Date],
+        testctx,
+        _eager_parsing=true,
+    )
+    @test testctx.header == [:a, :b]
+    @test testctx.results[1].cols[1] == [1]
+    @test testctx.results[1].cols[2] == [Date(2001,1,1)]
+    @test testctx.results[1].row_statuses == [RowStatus.Ok]
+    @test length(testctx.results[1].cols[1]) == 1
+    @test length(testctx.results[1].cols[2]) == 1
+end

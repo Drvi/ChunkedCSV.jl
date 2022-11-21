@@ -48,6 +48,7 @@ struct ParsingContext
     escapechar::UInt8
     cond::TaskCondition
     comment::Union{Nothing,Vector{UInt8}}
+    _eager_parsing::Bool
 end
 function estimate_task_size(parsing_ctx::ParsingContext)
     length(parsing_ctx.eols) == 1 && return 1 # empty file
@@ -67,13 +68,14 @@ struct ParserSettings
     maxtasks::UInt8
     nresults::UInt8
     comment::Union{Nothing,Vector{UInt8}}
+    _eager_parsing::Bool
 end
-function ParserSettings(schema, header::Vector{Symbol}, data_at, limit, validate_type_map, default_colname_prefix, buffersize, nworkers, maxtasks, nresults, comment)
-    ParserSettings(schema, header, UInt(0), UInt(data_at), limit, validate_type_map, default_colname_prefix, buffersize, nworkers, maxtasks, nresults, comment)
+function ParserSettings(schema, header::Vector{Symbol}, data_at, limit, validate_type_map, default_colname_prefix, buffersize, nworkers, maxtasks, nresults, comment, _eager_parsing)
+    ParserSettings(schema, header, UInt(0), UInt(data_at), limit, validate_type_map, default_colname_prefix, buffersize, nworkers, maxtasks, nresults, comment, _eager_parsing)
 end
 
-function ParserSettings(schema, header::Integer, data_at, limit, validate_type_map, default_colname_prefix, buffersize, nworkers, maxtasks, nresults, comment)
-    ParserSettings(schema, nothing, UInt(header), UInt(data_at), limit, validate_type_map, default_colname_prefix, buffersize, nworkers, maxtasks, nresults, comment)
+function ParserSettings(schema, header::Integer, data_at, limit, validate_type_map, default_colname_prefix, buffersize, nworkers, maxtasks, nresults, comment, _eager_parsing)
+    ParserSettings(schema, nothing, UInt(header), UInt(data_at), limit, validate_type_map, default_colname_prefix, buffersize, nworkers, maxtasks, nresults, comment, _eager_parsing)
 end
 
 function limit_eols!(parsing_ctx::ParsingContext, row_num)
@@ -167,6 +169,7 @@ function setup_parser(
     nresults::Integer=maxtasks,
     default_colname_prefix::String="COL_",
     use_mmap::Bool=false,
+    _eager_parsing::Bool=false,
 )
     0 < buffersize < typemax(UInt32) || throw(ArgumentError("`buffersize` argument must be larger than 0 and smaller than 4_294_967_295 bytes."))
     skipto >= 0 || throw(ArgumentError("`skipto` argument must be larger than 0."))
@@ -180,7 +183,8 @@ function setup_parser(
     should_close, io = _input_to_io(input, use_mmap)
     settings = ParserSettings(
         schema, header, UInt(skipto), UInt32(limit), validate_type_map, default_colname_prefix,
-        UInt32(buffersize), UInt8(nworkers), UInt8(maxtasks), UInt8(nresults), isnothing(comment) ? nothing : Vector{UInt8}(comment),
+        UInt32(buffersize), UInt8(nworkers), UInt8(maxtasks), UInt8(nresults),
+        isnothing(comment) ? nothing : Vector{UInt8}(comment), _eager_parsing
     )
     options = _create_options(;
         delim, openquotechar, closequotechar, escapechar, sentinel, groupmark, stripwhitespace,
@@ -243,12 +247,13 @@ function parse_file(
     _force::Symbol=:none,
     default_colname_prefix::String="COL_",
     use_mmap::Bool=false,
+    _eager_parsing::Bool=false,
 )
     (should_close, parsing_ctx, lexer_state, options) = setup_parser(
         input, schema;
         header, skipto, delim, openquotechar, closequotechar, limit, escapechar, sentinel,
         groupmark, stripwhitespace, truestrings, falsestrings, comment, validate_type_map,
-        default_colname_prefix, buffersize, nworkers, maxtasks, nresults, use_mmap
+        default_colname_prefix, buffersize, nworkers, maxtasks, nresults, use_mmap, _eager_parsing,
     )
     parse_file(lexer_state, parsing_ctx, consume_ctx, options, _force)
     should_close && close(lexer_state.io)

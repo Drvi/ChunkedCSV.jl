@@ -9,7 +9,7 @@ function skip_commented_row!(result_buf::TaskResultBuffer{N,M}, row_bytes, comme
     return false
 end
 
-function _parse_rows_forloop!(result_buf::TaskResultBuffer{N,M}, task::AbstractVector{UInt32}, buf, schema, options, comment::Union{Nothing,Vector{UInt8}}) where {N,M}
+function _parse_rows_forloop!(result_buf::TaskResultBuffer{N,M}, task::AbstractVector{UInt32}, buf, schema, options, comment::Union{Nothing,Vector{UInt8}}, _eager_parsing::Bool=false) where {N,M}
     empty!(result_buf)
     Base.ensureroom(result_buf, ceil(Int, length(task) * 1.01))
     for chunk_row_idx in 2:length(task)
@@ -286,7 +286,7 @@ function _parse_rows_forloop!(result_buf::TaskResultBuffer{N,M}, task::AbstractV
                 # end
                 # break
             end
-            if !Parsers.ok(code)
+            if (!Parsers.ok(code) && !_eager_parsing) || (_eager_parsing && !Parsers.valueok(code))
                 row_status |= RowStatus.ValueParsingError
                 row_status |= RowStatus.HasColumnIndicators
                 column_indicators = setflag(column_indicators, col_idx)
