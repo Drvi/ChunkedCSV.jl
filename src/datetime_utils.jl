@@ -128,11 +128,11 @@ Base.@propagate_inbounds function _default_tryparse_timestamp(buf, pos, len, cod
             return (_unsafe_datetime(year, month, day, hour, minute, second, millisecond), code, pos)
         else
             dt = _unsafe_datetime(year, month, day, hour, minute, second, millisecond)
-            ztd = TimeZones.ZonedDateTime(dt, TimeZones.TimeZone(tz))
-            return (Dates.DateTime(ztd, TimeZones.UTC), code, pos)
+            ztd = TimeZones.ZonedDateTime(dt, tz)
+            return (_unsafe_datetime(ztd, TimeZones.UTC), code, pos)
         end
     else
-        return (Dates._unsafe_datetime(0), code | Parsers.INVALID, pos)
+        return (_unsafe_datetime(0), code | Parsers.INVALID, pos)
     end
 end
 
@@ -141,22 +141,18 @@ end
 # This is needed until https://github.com/JuliaTime/TimeZones.jl/issues/271 is fixed
 const _Z = SubString("Z", 1:1)
 @inline function _tryparse_timezone(buf, pos, b, len, code)
+    nb = len - pos
     @inbounds if b == UInt8('+') || b == UInt8('-')
-        if len - pos < 2
-        elseif buf[pos+1] == UInt8('0')
+        if nb > 1 && buf[pos+1] == UInt8('0')
             if buf[pos+2] == UInt8('0')
-                if len - pos < 4
-                elseif buf[pos+3] == UInt8(':')
-                    if len - pos < 5
-                    elseif buf[pos+4] == UInt8('0')
-                        if buf[pos+5] == UInt8('0')
-                            return _Z, pos+5, UInt8('0'), code
-                        end
-                    end
-                elseif buf[pos+3] == UInt8('0')
-                    if buf[pos+4] == UInt8('0')
-                        return _Z, pos+4, UInt8('0'), code
-                    end
+                if nb == 2
+                    return (_Z, pos+2, UInt8('0'), code)        # [+-]00
+                elseif nb > 4 && buf[pos+3] == UInt8(':') && buf[pos+4] == UInt8('0') && buf[pos+5] == UInt8('0')
+                    return (_Z, pos+5+(nb>5), UInt8('0'), code) # [+-]00:00
+                elseif nb > 3 && buf[pos+3] == UInt8('0') && buf[pos+4] == UInt8('0')
+                    return (_Z, pos+4+(nb>4), UInt8('0'), code) # [+-]0000
+                elseif buf[pos+3] - UInt8('0') > 0x09
+                    return (_Z, pos+3, UInt8('0'), code)        # [+-]00
                 end
             end
         end
@@ -164,20 +160,14 @@ const _Z = SubString("Z", 1:1)
     end
 
     @inbounds if b == UInt8('G')
-        if len - pos < 3
-        elseif buf[pos+1] == UInt8('M')
-            if buf[pos+2] == UInt8('T')
-                return (_Z, pos+3, UInt8('T'), code)
-            end
+        if nb > 1 && buf[pos+1] == UInt8('M') && buf[pos+2] == UInt8('T')
+            return (_Z, pos+3+(nb>2), UInt8('T'), code) # GMT
         end
     elseif b == UInt8('z') || b == UInt8('Z')
-        return (_Z, pos+1, b, code)
+        return (_Z, pos+(nb>1), b, code)                # [Zz]
     elseif b == UInt8('U')
-        if len - pos < 3
-        elseif buf[pos+1] == UInt8('T')
-            if buf[pos+2] == UInt8('C')
-                return (_Z, pos+3, UInt8('C'), code)
-            end
+        if nb > 1 && buf[pos+1] == UInt8('T') && buf[pos+2] == UInt8('C')
+            return (_Z, pos+3+(nb>2), UInt8('T'), code) # UTC
         end
     end
     return Parsers.tryparsenext(Dates.DatePart{'Z'}(3, false), buf, pos, len, b, code)
